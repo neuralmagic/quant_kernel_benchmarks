@@ -84,65 +84,6 @@ def bench(types: TypeConfig,
             [kernel.create_bench_fn(bt, types.output_type) 
              for bt in benchmark_tensors]))
 
-    # timers = []
-    # # pytorch impl
-    # timers.append(
-    #     bench_fns(
-    #         label, sub_label, "torch.matmul (fp16)",
-    #         [torch_matmul_f16_create_bench_fn(bt)
-    #          for bt in benchmark_tensors]))
-
-    # if types.act_type == torch.int8 or types.act_type == torch.float8_e4m3fn:
-    #     timers.append(
-    #         bench_fns(label, sub_label,
-    #                   f"cutlass_scaled_mm ({terse_type_name(types.act_type)})", 
-    #                   [cutlass_scaled_mm_create_bench_fn(bt)
-    #                       for bt in benchmark_tensors
-    #                   ]))
-
-    # if types.act_type != torch.float8_e4m3fn:
-    #     timers.append(
-    #         bench_fns(label, sub_label, f"marlin ({name_type_string})",
-    #                   [marlin_create_bench_fn(bt)
-    #                    for bt in benchmark_tensors]))
-
-    # # machete
-    # timers.append(
-    #     bench_fns(label, sub_label, f"machete ({name_type_string})", [
-    #         machete_create_bench_fn(bt, out_type=types.output_type)
-    #         for bt in benchmark_tensors
-    #     ]))
-
-    # if sweep_schedules:
-    #     print("Finding best schedule for machete")
-    #     best = None
-    #     best_schedule = None
-    #     schedules = ops.machete_supported_schedules(
-    #         a_type=types.act_type, 
-    #         b_type=types.weight_type, 
-    #         group_scales_type=types.group_scale_type,
-    #         group_zeros_type=types.group_zero_type,
-    #         token_scales_type=types.token_scale_type,
-    #         channel_scales_type=types.channel_scale_type,
-    #         out_type=types.output_type)
-
-    #     if schedules is None or len(schedules) == 0:
-    #         raise ValueError("No schedules found to sweep")
-
-    #     for schedule in reversed(schedules):
-    #         res = bench_fns(label, sub_label, "machete_best", [
-    #             machete_create_bench_fn(
-    #                 bt, out_type=types.output_type, schedule=schedule)
-    #             for bt in benchmark_tensors
-    #         ])
-
-    #         print(f"  {res.median:5.5} ", schedule)
-    #         if not best or res.median < best.median:
-    #             best = res
-    #             best_schedule = schedule
-    #     print("Best schedule:", best_schedule)
-    #     timers.append(best)
-
     return timers
 
 

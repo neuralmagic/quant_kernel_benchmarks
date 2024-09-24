@@ -24,14 +24,15 @@ if __name__ == "__main__":
     parser.add_argument('filename', type=str)
     parser.add_argument('--shape', type=str, help='Specific shape to plot (e.g., "1024x1024")')
     parser.add_argument('--highlight', type=str, default='machete', help='Kernel to highlight')
+    parser.add_argument('--ignore', type=str, nargs='+', default=[], help='Kernels to ignore (not plot)')
 
     args = parser.parse_args()
 
     with open(args.filename, 'rb') as f:
         data: List[TMeasurement] = pickle.load(f)
 
-
     results = defaultdict(lambda: list())
+    all_kernels = set()
     for v in data["results"]:
         result = re.search(r"MKN=\(\d+x(\d+x\d+)\)", v.task_spec.sub_label)
         if result is not None:
@@ -45,11 +46,13 @@ if __name__ == "__main__":
             raise Exception("MKN not found")
 
         kernel = v.task_spec.description
-        results[KN].append({
-            "kernel": kernel,
-            "batch_size": M,
-            "median": v.median
-        })
+        all_kernels.add(kernel)
+        if kernel not in args.ignore:  # Only add results for kernels not in the ignore list
+            results[KN].append({
+                "kernel": kernel,
+                "batch_size": M,
+                "median": v.median
+            })
 
     if args.shape:
         if args.shape not in results:
@@ -71,6 +74,16 @@ if __name__ == "__main__":
     color_palette = sns.color_palette("husl", 8)
     # Find the most red color in the palette
     most_red_index = max(range(len(color_palette)), key=lambda i: color_palette[i][0])
+
+    # Assign colors to all kernels, including ignored ones
+    all_kernels_list = sorted(list(all_kernels))
+    kernel_colors = {kernel: color for kernel, color in zip(all_kernels_list, color_palette)}
+
+    # Ensure the highlighted kernel is the most red, even if it's ignored
+    if args.highlight in kernel_colors:
+        highlight_color = kernel_colors[args.highlight]
+        kernel_colors[args.highlight] = color_palette[most_red_index]
+        kernel_colors[all_kernels_list[most_red_index]] = highlight_color
 
     for axs_idx, shape in enumerate(shapes_to_plot):
         plt.sca(axs[axs_idx])
@@ -98,18 +111,11 @@ if __name__ == "__main__":
 
         normalized_df['batch_size'] = normalized_df['batch_size'].astype(str)
 
-        # Remove the BASELINE method from the plot
-        plot_df = normalized_df[normalized_df['kernel'] != BASELINE]
+        # Remove the BASELINE method and ignored kernels from the plot
+        plot_df = normalized_df[(normalized_df['kernel'] != BASELINE) & (~normalized_df['kernel'].isin(args.ignore))]
 
-        # Create a custom palette that ensures the highlighted kernel is the most red
-        kernels = plot_df['kernel'].unique()
-        kernel_colors = {kernel: color for kernel, color in zip(kernels, color_palette)}
-    
-        # Swap colors to make the highlighted kernel the most red
-        if args.highlight in kernel_colors:
-            highlight_color = kernel_colors[args.highlight]
-            kernel_colors[args.highlight] = color_palette[most_red_index]
-            kernel_colors[kernels[most_red_index]] = highlight_color
+        # Use the pre-assigned colors for the plot
+        plot_colors = {k: v for k, v in kernel_colors.items() if k in plot_df['kernel'].unique()}
 
         sns.lineplot(data=plot_df,
                      x="batch_size",
@@ -117,7 +123,7 @@ if __name__ == "__main__":
                      hue="kernel",
                      markers=True,
                      dashes=False,
-                     palette=kernel_colors,
+                     palette=plot_colors,
                      marker="o")  
 
         plt.title(f"Weight Shape: {shape} (OUTxIN)", fontsize=14)
