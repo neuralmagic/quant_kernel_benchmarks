@@ -161,7 +161,17 @@ def run_range_bench(args):
     MKNs = list(zip(Ms, Ks, Ns))
     data = run(args, MKNs)
 
-    make_output(data, MKNs, f"range_bench-{args.dtype}")
+    make_output(data, MKNs, f"range_bench-{args.act_type}")
+
+
+def run_shape_bench(args):
+    Ms = [int(m) for m in args.ms.split(",")]
+    Ks = [args.k] * len(Ms)
+    Ns = [args.n] * len(Ms)
+    MKNs = list(zip(Ms, Ks, Ns))
+    data = run(args, MKNs)
+
+    make_output(data, MKNs, f"shape_bench-{args.act_type}")
 
 
 def run_model_bench(args):
@@ -301,6 +311,12 @@ Benchmark Machete GEMM.
     square_parser.add_argument("--dim-increment", type=int, required=True)
     square_parser.set_defaults(func=run_square_bench)
 
+    shape_parser = subparsers.add_parser("shape_bench")
+    shape_parser.add_argument("--ms", type=str, default=None)
+    shape_parser.add_argument("--n", type=int, default=None)
+    shape_parser.add_argument("--k", type=int, default=None)
+    shape_parser.set_defaults(func=run_shape_bench)
+    
     range_parser = subparsers.add_parser("range_bench")
     range_parser.add_argument("--dim-start", type=int, required=True)
     range_parser.add_argument("--dim-end", type=int, required=True)
