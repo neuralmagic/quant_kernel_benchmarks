@@ -25,6 +25,7 @@ if __name__ == "__main__":
     parser.add_argument('--shape', type=str, help='Specific shape to plot (e.g., "1024x1024")')
     parser.add_argument('--highlight', type=str, default='machete', help='Kernel to highlight')
     parser.add_argument('--ignore', type=str, nargs='+', default=[], help='Kernels to ignore (not plot)')
+    parser.add_argument('--outfile', type=str, help='Output file name')
 
     args = parser.parse_args()
 
@@ -84,6 +85,14 @@ if __name__ == "__main__":
         highlight_color = kernel_colors[args.highlight]
         kernel_colors[args.highlight] = color_palette[most_red_index]
         kernel_colors[all_kernels_list[most_red_index]] = highlight_color
+
+    kernel_colors = {
+        "torch.mm (fp16)": "#FFC93F",
+        "machete": "#2A8EFD",
+        "marlin": "#03C883",
+        "gemlite": "#7E7F86",
+        "fbgemm_i4": "#D3D4DD"
+    }
 
     for axs_idx, shape in enumerate(shapes_to_plot):
         plt.sca(axs[axs_idx])
@@ -149,7 +158,7 @@ if __name__ == "__main__":
         fig.delaxes(axs[i])
 
     plt.tight_layout()
-    outfile = "graph_bench_normalized_runtime"
-    
-    plt.savefig(f"{outfile}.pdf", bbox_inches='tight')
-    print("Saved to", f"{outfile}.pdf")
+    plt.gca().spines[['right', 'top']].set_visible(False)
+    outfile = "graph_bench_normalized_runtime" if args.outfile is None else args.outfile
+    plt.savefig(f"{outfile}.svg", bbox_inches='tight', transparent=True)
+    print("Saved to", f"{outfile}.svg")

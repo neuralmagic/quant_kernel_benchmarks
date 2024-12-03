@@ -5,7 +5,7 @@ import math
 import torch.utils.benchmark as TBenchmark
 
 from vllm.model_executor.layers.quantization.utils.quant_utils import (
-    quantize_weights, pack_weights_into_int32)
+    quantize_weights, pack_quantized_values_into_int32)
 from vllm.scalar_type import ScalarType
 
 def terse_type_name(dt):
@@ -67,7 +67,7 @@ def quantize_and_pack(atype: torch.dtype,
         # to match how the kernel applies zps
         ref_zero_points_after_scales=True)
 
-    w_q_packed = pack_weights_into_int32(w_q, wtype)
+    w_q_packed = pack_quantized_values_into_int32(w_q, wtype)
     return w_ref, w_q, w_q_packed, w_s, w_zp
 
 

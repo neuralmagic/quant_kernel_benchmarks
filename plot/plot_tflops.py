@@ -12,6 +12,9 @@ from torch.utils.benchmark import Measurement as TMeasurement
 
 from vllm.utils import FlexibleArgumentParser
 
+def calculate_flops(M: int, K: int, N: int, L: int) -> float:
+    return 2 * M * N * K * L # GEMM FLOPS
+
 # Set the font to Roboto
 plt.rcParams['font.family'] = 'Roboto'
 
@@ -22,6 +25,7 @@ if __name__ == "__main__":
     parser.add_argument('--shape', type=str, help='Specific shape to plot (e.g., "1024x1024")')
     parser.add_argument('--highlight', type=str, default='machete', help='Kernel to highlight')
     parser.add_argument('--ignore', type=str, nargs='+', default=[], help='Kernels to ignore (not plot)')
+    parser.add_argument('--outfile', type=str, help='Output file name')
     args = parser.parse_args()
 
     with open(args.filename, 'rb') as f:
@@ -94,6 +98,14 @@ if __name__ == "__main__":
         kernel_colors[args.highlight] = color_palette[most_red_index]
         kernel_colors[all_kernels_list[most_red_index]] = highlight_color
 
+    kernel_colors = {
+        "torch.mm (fp16)": "#FFC93F",
+        "machete": "#2A8EFD",
+        "marlin": "#03C883",
+        "gemlite": "#7E7F86",
+        "fbgemm_i4": "#D3D4DD"
+    }
+
     for axs_idx, shape in enumerate(shapes_to_plot):
         plt.sca(axs[axs_idx])
         df = pd.DataFrame(results[shape])
@@ -129,7 +141,8 @@ if __name__ == "__main__":
         fig.delaxes(axs[i])
 
     plt.tight_layout()
-    outfile = f"graph_bench_tflops_{args.device}"
+    outfile = f"graph_bench_tflops" if args.outfile is None else args.outfile
     
-    plt.savefig(f"{outfile}.pdf", bbox_inches='tight')
-    print(f"Saved to {outfile}.pdf")
+    plt.gca().spines[['right', 'top']].set_visible(False)
+    plt.savefig(f"{outfile}.svg", bbox_inches='tight', transparent=True)
+    print(f"Saved to {outfile}.svg")

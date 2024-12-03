@@ -1,6 +1,7 @@
 import argparse
 import copy
 import os
+import sys
 import itertools
 import math
 import pickle as pkl
@@ -27,6 +28,7 @@ DEFAULT_BATCH_SIZES = [1, 16, 32, 64, 128, 256, 512, 1024]
 DEFAULT_TP_SIZES = [1]
 
 NVTX_PROFILE = os.environ.get("NVTX_PROFILE", False)
+NSYS_PROFILE = os.environ.get("NSYS_PROFILE", False)
 
 if NVTX_PROFILE:
     import nvtx
@@ -35,22 +37,54 @@ if NVTX_PROFILE:
 
 # bench
 
+def _bench_cuda_graph(fns: List[Callable]):
+    print("Running with CUDA Graphs")
+    # Warm-up
+    for fn in fns:
+        fn()
+
+    torch.cuda.synchronize()
+    # Capture the graph.
+    graph = torch.cuda.CUDAGraph()
+    with torch.cuda.graph(graph):
+        for fn in fns:
+            fn()
+    return {
+        "stmt": "graph.replay()",
+        "globals": { "graph": graph },
+    }
+
+def _bench_loop(fns: List[Callable]):
+    return {
+        "stmt": 
+            """
+            for fn in fns:
+                fn()
+            """,
+        "globals": {
+            "fns": fns
+        },
+    }
+
+
 def bench_fns(label: str, sub_label: str, description: str,
               fns: List[Callable]):
     
     min_run_time = 1 if not NVTX_PROFILE else 0.1
-    res = TBenchmark.Timer(
-        stmt="""
+    res = None
+    if not (NSYS_PROFILE or NVTX_PROFILE):
+        res = TBenchmark.Timer(
+            **_bench_cuda_graph(fns),
+            label=label,
+            sub_label=sub_label,
+            description=description,
+        ).blocked_autorange(min_run_time=min_run_time)
+    elif NSYS_PROFILE:
+        print(f"Running {label}|{sub_label}|{description}")
+        torch.cuda.nvtx.range_push(f"{label}|{sub_label}|{description}")
         for fn in fns:
             fn()
-        """,
-        globals={
-            "fns": fns
-        },
-        label=label,
-        sub_label=sub_label,
-        description=description,
-    ).blocked_autorange(min_run_time=min_run_time)
+        torch.cuda.nvtx.range_pop()
 
     if NVTX_PROFILE:
         with nvtx.annotate("mm-bench"):
@@ -106,6 +140,9 @@ def run(args, MKNs: Iterable[Tuple[int, int, int]]) -> Iterable[TMeasurement]:
         token_scale_type=args.token_scale_type,
     )
     
+    if NSYS_PROFILE or NVTX_PROFILE:
+        torch.cuda.cudart().cudaProfilerStart()
+    
     results: List[TMeasurement] = []
     for m, k, n in MKNs:
         timers = bench(types,
@@ -117,8 +154,14 @@ def run(args, MKNs: Iterable[Tuple[int, int, int]]) -> Iterable[TMeasurement]:
                        f"MKN=({m}x{k}x{n})",
                        kernels=args.kernels.split(","),
                        sweep_schedules=args.sweep_schedules)
-        print_timers(timers)
-        results.extend(timers)
+        
+        if not (NSYS_PROFILE or NVTX_PROFILE):
+            print_timers(timers)
+            results.extend(timers)
+    
+    if NSYS_PROFILE or NVTX_PROFILE:
+        torch.cuda.cudart().cudaProfilerStop()
+        sys.exit(0)
 
     return results
 
